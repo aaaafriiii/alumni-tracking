@@ -56,7 +56,7 @@ https://aaaafriiii.github.io/alumni-tracking/
 
 Source code project dapat diakses melalui link berikut:
 
-https://github.com/username/alumni-tracking-system
+https://github.com/aaaafriiii/alumni-tracking
 
 ---
 
