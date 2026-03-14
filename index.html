@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pelacakan Alumni Publik - UMM</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <nav>
+            <h1>🕵️ Sistem Pelacakan Alumni Publik</h1>
+            <ul>
+                <li><a href="#intro">Pendahuluan</a></li>
+                <li><a href="#steps">Langkah-langkah</a></li>
+                <li><a href="#demo">Demo</a></li>
+                <li><a href="#contact">Kontak</a></li>
+
+            </ul>
+        </nav>
+    </header>
+
+    <section id="intro" class="hero">
+        <div class="container">
+            <h2>Sistem Otomatis untuk Melacak Aktivitas Alumni di Sumber Publik</h2>
+            <p>Mengumpulkan informasi publik tentang alumni Universitas Muhammadiyah Malang (UMM) dari sumber terpercaya seperti Google Scholar, situs universitas, LinkedIn, dll. Dengan hormat pada privasi dan ToS.</p>
+        </div>
+    </section>
+
+    <section id="demo" class="demo">
+        <div class="container">
+            <h2>Pelacakan Alumni</h2>
+            
+            <div class="demo-panel">
+                <div class="form-group">
+                    <label for="alumni-select">Pilih Alumni:</label>
+                    <select id="alumni-select">
+                        <!-- Populated by JS -->
+                    </select>
+                </div>
+                <button id="track-btn" class="btn-primary"> Jalankan Pelacakan </button>
+                <div id="queries" class="queries-section"></div>
+                <div id="results" class="results-section">
+                    <table id="results-table">
+                        <thead>
+                            <tr>
+                                <th>Kandidat</th>
+                                <th>Sinyal</th>
+                                <th>Score</th>
+                                <th>Status</th>
+                                <th>Sumber</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <div id="summary" class="summary"></div>
+            </div>
+        </div>
+    </section>
+
+    <section id="contact" class="footer">
+
+        <div class="container">
+            <p>&amp;copy; 2024 Sistem Pelacakan Alumni UMM. Dibuat dengan <span class="heart"></span> untuk alumni.</p>
+        </div>
+    </section>
+
+    <script src="script.js"></script>
+</body>
+</html>
