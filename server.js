@@ -10,6 +10,12 @@ const PORT = process.env.PORT || 3000;
 // Enable trust proxy for Vercel
 app.set('trust proxy', 1);
 
+// Health check
+app.get('/api/health', (req, res) => {
+    const dbExists = fs.existsSync(path.join(__dirname, 'alumni.db'));
+    res.json({ status: 'ok', dbExists: dbExists, dirname: __dirname });
+});
+
 // Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
