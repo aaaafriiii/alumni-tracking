@@ -2,27 +2,19 @@ const express = require('express');
 const cookieSession = require('cookie-session');
 const bodyParser = require('body-parser');
 const path = require('path');
-const sqlite3 = require('sqlite3').verbose();
+const fs = require('fs');
+const initSqlJs = require('sql.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Enable trust proxy for Vercel
 app.set('trust proxy', 1);
 
-// Health check
-app.get('/api/health', (req, res) => {
-    const dbExists = fs.existsSync(path.join(__dirname, 'alumni.db'));
-    res.json({ status: 'ok', dbExists: dbExists, dirname: __dirname });
-});
-
-// Middleware
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 const publicPath = path.join(__dirname, 'public');
 app.use(express.static(publicPath));
 
-// Explicit routes for HTML pages
 app.get('/', (req, res) => res.sendFile(path.join(publicPath, 'index.html')));
 app.get('/login.html', (req, res) => res.sendFile(path.join(publicPath, 'login.html')));
 app.get('/dashboard.html', (req, res) => res.sendFile(path.join(publicPath, 'dashboard.html')));
@@ -33,23 +25,37 @@ app.use(cookieSession({
     maxAge: 24 * 60 * 60 * 1000
 }));
 
-// SQLite Connection (Open once)
-const dbPath = path.join(__dirname, 'alumni.db');
-const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
-    if (err) console.error("Error opening database:", err);
-    else console.log("Connected to SQLite database.");
+// Global DB instance
+let db;
+
+// Initialize SQL.js
+async function initDatabase() {
+    if (db) return db;
+    const SQL = await initSqlJs();
+    const dbPath = path.join(__dirname, 'alumni.db');
+    const fileBuffer = fs.readFileSync(dbPath);
+    db = new SQL.Database(fileBuffer);
+    console.log("SQL.js Database initialized.");
+    return db;
+}
+
+// Ensure DB is loaded before handling requests
+app.use(async (req, res, next) => {
+    try {
+        await initDatabase();
+        next();
+    } catch (err) {
+        res.status(500).json({ error: "Failed to initialize database: " + err.message });
+    }
 });
 
-// Login Credentials
 const USERS = [{ username: 'admin', password: 'alumni2026' }];
 
-// Auth Middleware
 const checkAuth = (req, res, next) => {
     if (req.session.isLoggedIn) next();
     else res.status(401).json({ message: 'Unauthorized' });
 };
 
-// API Routes
 app.post('/api/login', (req, res) => {
     const { username, password } = req.body;
     const user = USERS.find(u => u.username === username && u.password === password);
@@ -63,11 +69,10 @@ app.post('/api/login', (req, res) => {
 });
 
 app.get('/api/logout', (req, res) => {
-    req.session.destroy ? req.session.destroy() : (req.session = null);
+    req.session = null;
     res.json({ success: true });
 });
 
-// Optimized Paginated Alumni API with SQLite
 app.get('/api/alumni', checkAuth, (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 50;
@@ -76,52 +81,57 @@ app.get('/api/alumni', checkAuth, (req, res) => {
 
     let query = "SELECT * FROM alumni";
     let countQuery = "SELECT COUNT(*) as count FROM alumni";
-    let params = [];
+    let params = {};
 
     if (search) {
-        query += " WHERE nama LIKE ? OR nim LIKE ?";
-        countQuery += " WHERE nama LIKE ? OR nim LIKE ?";
-        params = [`%${search}%`, `%${search}%`];
+        query += " WHERE nama LIKE :search OR nim LIKE :search";
+        countQuery += " WHERE nama LIKE :search OR nim LIKE :search";
+        params = { ':search': `%${search}%` };
     }
 
-    query += " LIMIT ? OFFSET ?";
-    const queryParams = [...params, limit, offset];
+    query += ` LIMIT ${limit} OFFSET ${offset}`;
 
-    // Get Data and Total Count
-    db.get(countQuery, params, (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
-        const total = row.count;
+    try {
+        // Total Count
+        const countRes = db.exec(countQuery, params);
+        const total = countRes[0].values[0][0];
 
-        db.all(query, queryParams, (err, rows) => {
-            if (err) return res.status(500).json({ error: err.message });
+        // Data
+        const dataRes = db.exec(query, params);
+        const columns = dataRes[0] ? dataRes[0].columns : [];
+        const values = dataRes[0] ? dataRes[0].values : [];
 
-            // Stats (PNS vs others) - Calculated from the full set (might be slow for 142k, but SQLite handles it)
-            db.get("SELECT COUNT(*) as count FROM alumni WHERE tipe_pekerjaan = 'PNS'", (err, pnsRow) => {
-                const pnsCount = pnsRow ? pnsRow.count : 0;
-                
-                // Map DB rows to the format expected by frontend
-                const data = rows.map(r => ({
-                    id: r.id,
-                    nama: r.nama,
-                    nim: r.nim,
-                    prodi: r.prodi,
-                    tahun_lulus: r.tahun_lulus,
-                    social_media: { linkedin: r.linkedin, ig: r.ig, fb: r.fb, tiktok: r.tiktok },
-                    email: r.email,
-                    no_hp: r.no_hp,
-                    pekerjaan: { tempat: r.tempat_kerja, alamat: r.alamat_kerja, posisi: r.posisi, tipe: r.tipe_pekerjaan, sosmed_kantor: r.sosmed_kantor }
-                }));
+        // Stats
+        const pnsRes = db.exec("SELECT COUNT(*) FROM alumni WHERE tipe_pekerjaan = 'PNS'");
+        const pnsCount = pnsRes[0].values[0][0];
 
-                res.json({
-                    total: total,
-                    page: page,
-                    limit: limit,
-                    data: data,
-                    stats: { pns: pnsCount, working: total - pnsCount }
-                });
-            });
+        // Format
+        const data = values.map(row => {
+            const obj = {};
+            columns.forEach((col, i) => obj[col] = row[i]);
+            return {
+                id: obj.id,
+                nama: obj.nama,
+                nim: obj.nim,
+                prodi: obj.prodi,
+                tahun_lulus: obj.tahun_lulus,
+                social_media: { linkedin: obj.linkedin, ig: obj.ig, fb: obj.fb, tiktok: obj.tiktok },
+                email: obj.email,
+                no_hp: obj.no_hp,
+                pekerjaan: { tempat: obj.tempat_kerja, alamat: obj.alamat_kerja, posisi: obj.posisi, tipe: obj.tipe_pekerjaan, sosmed_kantor: obj.sosmed_kantor }
+            };
         });
-    });
+
+        res.json({
+            total: total,
+            page: page,
+            limit: limit,
+            data: data,
+            stats: { pns: pnsCount, working: total - pnsCount }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.get('/api/session', (req, res) => {

@@ -5,7 +5,7 @@
             "src": "server.js",
             "use": "@vercel/node",
             "config": {
-                "includeFiles": ["alumni.db"]
+                "includeFiles": ["alumni.db", "sql-wasm.wasm"]
             }
         }
     ],
