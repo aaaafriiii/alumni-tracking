@@ -31,7 +31,9 @@ let db;
 // Initialize SQL.js
 async function initDatabase() {
     if (db) return db;
-    const SQL = await initSqlJs();
+    const SQL = await initSqlJs({
+        locateFile: file => path.join(__dirname, file)
+    });
     const dbPath = path.join(__dirname, 'alumni.db');
     const fileBuffer = fs.readFileSync(dbPath);
     db = new SQL.Database(fileBuffer);
@@ -62,9 +64,9 @@ app.post('/api/login', (req, res) => {
     if (user) {
         req.session.isLoggedIn = true;
         req.session.username = username;
-        res.json({ success: true });
+        res.json({ success: true, message: 'Login successful' });
     } else {
-        res.status(401).json({ success: false });
+        res.status(401).json({ success: false, message: 'Invalid username or password' });
     }
 });
 
