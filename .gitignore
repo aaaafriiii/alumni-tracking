@@ -1,0 +1,8 @@
+node_modules
+.DS_Store
+alumni_db.json
+alumni_db.json.gz
+generate_data.js
+generate_data_full.js
+convert_to_sqlite.js
+.env
