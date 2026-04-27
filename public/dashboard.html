@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Alumni Tracker</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        .pagination-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+        .page-info {
+            font-size: 0.875rem;
+            color: var(--secondary);
+            font-weight: 500;
+        }
+        #loadingOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="loadingOverlay">
+        <div style="text-align: center;">
+            <div class="spinner-grow text-primary" role="status"></div>
+            <p style="margin-top: 1rem; font-weight: 600;">Memuat data...</p>
+        </div>
+    </div>
+
+    <nav class="navbar glass">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="background: var(--primary); color: white; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                <i class="bi bi-radar"></i>
+            </div>
+            <h1 style="font-size: 1.25rem; font-weight: 700;">AlumniTracker</h1>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1.5rem;">
+            <span id="userName" style="font-weight: 500; color: var(--secondary);"></span>
+            <button id="logoutBtn" class="btn btn-outline" style="padding: 0.5rem 1rem;">Keluar</button>
+        </div>
+    </nav>
+
+    <div class="container">
+        <header style="margin-bottom: 2.5rem;" class="animate-fade-in">
+            <h2 style="font-size: 2rem; font-weight: 700;">Data Alumni Lengkap</h2>
+            <p style="color: var(--secondary);">Menampilkan seluruh data alumni dari database (140.000+ data).</p>
+        </header>
+
+        <div class="stats-grid animate-fade-in" style="animation-delay: 0.1s;">
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #e0e7ff; color: #3730a3;"><i class="bi bi-people"></i></div>
+                <div>
+                    <h3 id="totalAlumni">0</h3>
+                    <p style="font-size: 0.875rem; color: var(--secondary);">Total Terdata</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #dcfce7; color: #166534;"><i class="bi bi-briefcase"></i></div>
+                <div>
+                    <h3 id="totalWorking">0</h3>
+                    <p style="font-size: 0.875rem; color: var(--secondary);">Bekerja/Wirausaha</p>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon" style="background: #fef3c7; color: #92400e;"><i class="bi bi-patch-check"></i></div>
+                <div>
+                    <h3 id="totalPNS">0</h3>
+                    <p style="font-size: 0.875rem; color: var(--secondary);">PNS</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card animate-fade-in" style="animation-delay: 0.2s; padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h3 style="font-weight: 700;">Daftar Alumni</h3>
+                <div style="display: flex; gap: 1rem;">
+                    <input type="text" id="searchInput" class="form-control" style="width: 300px;" placeholder="Cari nama atau NIM...">
+                    <button id="searchBtn" class="btn btn-primary"><i class="bi bi-search"></i></button>
+                </div>
+            </div>
+
+            <div class="data-table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Alumni</th>
+                            <th>Kontak</th>
+                            <th>Pekerjaan</th>
+                            <th>Status</th>
+                            <th>Media Sosial</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alumniTableBody">
+                        <!-- Data populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="pagination-container">
+                <button id="prevPage" class="btn btn-outline" style="padding: 0.5rem 1rem;"><i class="bi bi-chevron-left"></i></button>
+                <span class="page-info">Halaman <span id="currentPage">1</span> dari <span id="totalPages">1</span></span>
+                <button id="nextPage" class="btn btn-outline" style="padding: 0.5rem 1rem;"><i class="bi bi-chevron-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+        const limit = 50;
+        let totalRecords = 0;
+
+        async function checkSession() {
+            const res = await fetch('/api/session');
+            const data = await res.json();
+            if (!data.loggedIn) {
+                window.location.href = 'login.html';
+            } else {
+                document.getElementById('userName').textContent = data.user;
+            }
+        }
+
+        async function fetchAlumni() {
+            const loading = document.getElementById('loadingOverlay');
+            loading.style.display = 'flex';
+
+            const search = document.getElementById('searchInput').value;
+            const res = await fetch(`/api/alumni?page=${currentPage}&limit=${limit}&search=${encodeURIComponent(search)}`);
+            const result = await res.json();
+            
+            totalRecords = result.total;
+            renderTable(result.data);
+            updateStats(result.stats, result.total);
+            updatePagination();
+
+            loading.style.display = 'none';
+        }
+
+        function renderTable(data) {
+            const tbody = document.getElementById('alumniTableBody');
+            tbody.innerHTML = '';
+
+            data.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>
+                        <div style="font-weight: 600;">${item.nama}</div>
+                        <div style="font-size: 0.75rem; color: var(--secondary);">${item.nim} | ${item.prodi}</div>
+                    </td>
+                    <td>
+                        <div style="font-size: 0.875rem;"><i class="bi bi-envelope me-1"></i> ${item.email}</div>
+                        <div style="font-size: 0.875rem;"><i class="bi bi-telephone me-1"></i> ${item.no_hp}</div>
+                    </td>
+                    <td>
+                        <div style="font-weight: 500;">${item.pekerjaan.tempat}</div>
+                        <div style="font-size: 0.75rem; color: var(--secondary);">${item.pekerjaan.posisi}</div>
+                    </td>
+                    <td>
+                        <span class="badge badge-${item.pekerjaan.tipe.toLowerCase()}">${item.pekerjaan.tipe}</span>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 0.5rem; font-size: 1.1rem;">
+                            <a href="${item.social_media.linkedin}" target="_blank" style="color: #0a66c2;"><i class="bi bi-linkedin"></i></a>
+                            <a href="#" title="IG: ${item.social_media.ig}" style="color: #e1306c;"><i class="bi bi-instagram"></i></a>
+                            <a href="#" title="FB: ${item.social_media.fb}" style="color: #1877f2;"><i class="bi bi-facebook"></i></a>
+                            <a href="#" title="Kantor: ${item.pekerjaan.sosmed_kantor}" style="color: var(--secondary);"><i class="bi bi-building"></i></a>
+                        </div>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateStats(stats, total) {
+            document.getElementById('totalAlumni').textContent = total.toLocaleString();
+            document.getElementById('totalWorking').textContent = stats.working.toLocaleString();
+            document.getElementById('totalPNS').textContent = stats.pns.toLocaleString();
+        }
+
+        function updatePagination() {
+            const totalPages = Math.ceil(totalRecords / limit) || 1;
+            document.getElementById('currentPage').textContent = currentPage;
+            document.getElementById('totalPages').textContent = totalPages;
+            
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = currentPage === totalPages;
+        }
+
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                fetchAlumni();
+            }
+        });
+
+        document.getElementById('nextPage').addEventListener('click', () => {
+            const totalPages = Math.ceil(totalRecords / limit);
+            if (currentPage < totalPages) {
+                currentPage++;
+                fetchAlumni();
+            }
+        });
+
+        document.getElementById('searchBtn').addEventListener('click', () => {
+            currentPage = 1;
+            fetchAlumni();
+        });
+
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                currentPage = 1;
+                fetchAlumni();
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            await fetch('/api/logout');
+            localStorage.removeItem('isLoggedIn');
+            window.location.href = 'login.html';
+        });
+
+        checkSession();
+        fetchAlumni();
+    </script>
+</body>
+</html>
