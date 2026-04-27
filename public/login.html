@@ -44,6 +44,13 @@
     <script>
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const btn = e.target.querySelector('button');
+            const originalContent = btn.innerHTML;
+            
+            // Loading state
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Memproses...';
+            
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
             const messageDiv = document.getElementById('message');
@@ -58,7 +65,7 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    messageDiv.style.color = 'var(--success)';
+                    messageDiv.style.color = '#10b981';
                     messageDiv.textContent = 'Login berhasil! Mengalihkan...';
                     messageDiv.style.display = 'block';
                     localStorage.setItem('isLoggedIn', 'true');
@@ -66,13 +73,17 @@
                         window.location.href = 'dashboard.html';
                     }, 1500);
                 } else {
-                    messageDiv.style.color = 'var(--danger)';
-                    messageDiv.textContent = data.message;
+                    btn.disabled = false;
+                    btn.innerHTML = originalContent;
+                    messageDiv.style.color = '#ef4444';
+                    messageDiv.textContent = data.message || 'Username atau Password salah';
                     messageDiv.style.display = 'block';
                 }
             } catch (error) {
-                messageDiv.style.color = 'var(--danger)';
-                messageDiv.textContent = 'Terjadi kesalahan pada server.';
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+                messageDiv.style.color = '#ef4444';
+                messageDiv.textContent = 'Terjadi kesalahan pada server atau database sedang memuat.';
                 messageDiv.style.display = 'block';
             }
         });
